@@ -742,9 +742,9 @@ class ExcelComparisonApp(QWidget):
         sheet_name_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """)  #背景色+边框圆角
         sheet_index_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """) #背景色+边框圆角
         sheet_index_blank_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """) #背景色+边框圆角
-        sheet_index_title_layout.addWidget(sheet_name_label, 5)
-        sheet_index_title_layout.addWidget(sheet_index_label, 11)
-        sheet_index_title_layout.addWidget(sheet_index_blank_label, 4)
+        sheet_index_title_layout.addWidget(sheet_name_label, 8)
+        sheet_index_title_layout.addWidget(sheet_index_label, 16)
+        sheet_index_title_layout.addWidget(sheet_index_blank_label, 3)
 
         for index in range(0, self.sheet_name_index_number):
             self.major_sheet_layout[index] = QHBoxLayout()
