@@ -27,9 +27,10 @@
 ##  2025/04/22  完成优化单元格为空时的逻辑
 ##  2025/05/08  封装cell_consistency_check方法，简化代码
 ##  2025/05/08  解决浮点数对比不同问题，在字符串对比不同后增加浮点数对比，此问题原因是当文件有数据验证且数据验证有小数点时，会导致单元格内容转字符串时强制带小数，导致对比不同
-##	
-##  ----------------------------------------------未完待续---------------------------------------------------------------------
+##  2025/05/11  解决jason文件错误时，程序异常退出问题，当json文件错误时，直接将其删掉.....
+##  2025/05/12  已解决jason文件错误时，程序异常退出的问题，当json文件错误时，直接跳过对current data赋值
 
+##  ----------------------------------------------未完待续---------------------------------------------------------------------
 ##
 ##
 ##
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     import self_tool
 else:
     # 这里是模块被导入时要执行的代码逻辑，比如执行相关的函数、初始化操作等
-    from ..self_package import self_tool
+    from . import self_tool
 
 output_path_name = ".\outputfile"
 
@@ -603,6 +604,8 @@ class ComparisonTask(QRunnable):
 class Stored_data:
     def __init__(self, number, index_column_number):
         if isinstance(number, int) and number > 0:
+            self.number = number
+            self.index_column_number = index_column_number
             self.file1_path = ""
             self.file2_path = ""
             self.sheet_name_edit = ["" for _ in range(number)]
@@ -634,14 +637,32 @@ class Stored_data:
                 with open(filename, 'r') as f:
                     # 使用 json.load 方法从文件中读取数据并转换为字典
                     data = json.load(f)
+                    # 检查data长度是否符合要求
+                    if len(data['sheet_name_edit'])  != self.number:
+                        print("jason文件中sheet_name_edit长度不等于{self.number}，跳过读取jason文件操作。")
+                        return 0
+                    elif len(data['index_edit']) != self.number:
+                        print("jason文件中index_edit长度不等于{self.number}，跳过读取jason文件操作。")
+                        return 0
+                    elif len(data['mapping_title_flag'])  != self.number:
+                        print("jason文件中mapping_title_flag长度不等于{self.number}，跳过读取jason文件操作。")
+                        return 0
+                    else:
+                        for index in range(0, self.number):
+                            if len(data['index_edit'][index]) != self.index_column_number:
+                                print(f"jason文件中index_edit的第{index+1}个元素的长度不等于{self.index_column_number}，跳过读取jason文件操作。")
+                                return 0
                     # 从字典中获取相应的数据并更新存储类的属性
                     self.__dict__.update(data)
-                    print(f"self.current_data.mapping_title_flag = {self.mapping_title_flag}")
-            except FileNotFoundError:
+                    # print(f"self.current_data.mapping_title_flag = {self.mapping_title_flag}")
+                    return 1
+            except (FileNotFoundError, json.JSONDecodeError) as e:
                 # 如果文件不存在，忽略错误，保持默认值
-                pass
+                print("文件不存在或JSONDecode错误，跳过读取操作。")
+                return 0
         else:
-            print("文件为空或不存在，跳过读取操作。")     
+            print("文件为空或不存在，跳过读取操作。")
+            return 0
 
 class ExcelComparisonApp(QWidget):
     def __init__(self):
@@ -663,7 +684,7 @@ class ExcelComparisonApp(QWidget):
         font.setBold(True)
         
         self.sheet_name_index_number = 5    # 可重点对比的sheet最大个数
-        self.index_column_number = 2    # index组合对比的列数量，当前设置为可将2列组合作为索引
+        self.index_column_number = 3        # index组合对比的列数量，当前设置为可将2列组合作为索引
         self.start_flag = True
         
         self.current_data = Stored_data(self.sheet_name_index_number, self.index_column_number)   # 各部件当前状态数据
@@ -732,25 +753,26 @@ class ExcelComparisonApp(QWidget):
         
         sheet_name_label = QLabel("sheet name")     #标题sheet名称
         sheet_index_label = QLabel("index column")  #标题 索引列
-        sheet_index_blank_label = QLabel("Flag")    #Mapping Flag
+        sheet_index_mapping_label = QLabel("Flag")    #Mapping Flag
         sheet_name_label.setAlignment(Qt.AlignCenter)
         sheet_index_label.setAlignment(Qt.AlignCenter)
-        sheet_index_blank_label.setAlignment(Qt.AlignCenter)
+        sheet_index_mapping_label.setAlignment(Qt.AlignCenter)
         sheet_name_label.setFixedHeight(30)
         sheet_index_label.setFixedHeight(30)
-        sheet_index_blank_label.setFixedHeight(30)
+        sheet_index_mapping_label.setFixedHeight(30)
+        sheet_index_mapping_label.setFixedWidth(120)
         sheet_name_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """)  #背景色+边框圆角
         sheet_index_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """) #背景色+边框圆角
-        sheet_index_blank_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """) #背景色+边框圆角
-        sheet_index_title_layout.addWidget(sheet_name_label, 8)
-        sheet_index_title_layout.addWidget(sheet_index_label, 16)
-        sheet_index_title_layout.addWidget(sheet_index_blank_label, 3)
+        sheet_index_mapping_label.setStyleSheet(f"""background-color: #87cbf0; border-radius:5 """) #背景色+边框圆角
+        sheet_index_title_layout.addWidget(sheet_name_label, 4)
+        sheet_index_title_layout.addWidget(sheet_index_label, self.index_column_number*2)
+        sheet_index_title_layout.addWidget(sheet_index_mapping_label)
 
         for index in range(0, self.sheet_name_index_number):
             self.major_sheet_layout[index] = QHBoxLayout()
             self.sheet_name_edit[index] = QLineEdit()
             self.sheet_name_edit[index].setStyleSheet(f""" border-style: solid; 
-                                            border-width: 1px; 
+                                            border-width: 2px; 
                                             border-color: {self.Border_color}; 
                                             border-radius:2 """)
             for x in range(0, self.index_column_number):
@@ -761,6 +783,7 @@ class ExcelComparisonApp(QWidget):
                                                 border-radius:2 """)
             #按钮：按照每列表头进行对比
             self.mapping_title_button[index] = QPushButton("Mapping Title")
+            self.mapping_title_button[index].setFixedWidth(120)
             self.mapping_title_button[index].setStyleSheet("""
                 QPushButton {
                     background-color: #FFFFFF;  /* 默认背景色为白色 */
@@ -772,9 +795,9 @@ class ExcelComparisonApp(QWidget):
             # self.mapping_title_button[index].setStyleSheet(f"background-color:{self.Button_Color};")
             self.mapping_title_button[index].clicked.connect(lambda _, idx=index: self.mapping_title_button_Func(idx))
             
-            self.major_sheet_layout[index].addWidget(self.sheet_name_edit[index])
+            self.major_sheet_layout[index].addWidget(self.sheet_name_edit[index], 4)
             for x in range(0, self.index_column_number):
-                self.major_sheet_layout[index].addWidget(self.index_edit[index][x])
+                self.major_sheet_layout[index].addWidget(self.index_edit[index][x], 2)
             self.major_sheet_layout[index].addWidget(self.mapping_title_button[index])
         
         # 当前正在执行的Task
@@ -883,7 +906,7 @@ class ExcelComparisonApp(QWidget):
             self.file2_path_edit.setText(file_path)
             self.current_data.file2_path = file_path
     
-    def mapping_title_button_Func(self, index):  #----------------------------------------------------------------------------------------#
+    def mapping_title_button_Func(self, index):
         # mapping表头的按钮状态切换
         if self.mapping_title_flag[index] != 0:
             self.mapping_title_flag[index] = 0
